@@ -1,4 +1,4 @@
-# step3_check.py - are the form cheats gone? what do real bugs look like?
+
 import pandas as pd
 from sklearn.feature_extraction.text import CountVectorizer
 from settings import DATA_FOLDER
@@ -7,7 +7,6 @@ pd.set_option('display.width', 200)
 pd.set_option('display.max_columns', 20)
 dfa = pd.read_parquet(DATA_FOLDER + '/model_a_data.parquet')
 
-# ---------- check 1: are there still repeated template lines? ----------
 print('CHECK 1: most common lines in each repo (should be only a few %)')
 for repo in dfa['repo'].unique():
     part = dfa[dfa['repo'] == repo]
@@ -25,7 +24,6 @@ for repo in dfa['repo'].unique():
         print(f"{100 * n / len(part):5.0f}  {100 * with_line['is_bug'].mean():5.0f}  {line[:70]}")
 
 
-# ---------- check 2: simple features in each group ----------
 train = dfa[dfa['is_test_repo'] == False].copy()
 text = (train['clean_title'] + ' ' + train['clean_text']).str.lower()
 
@@ -48,13 +46,10 @@ print('\nCHECK 2: % of issues with each feature')
 print(table.round().reindex(['true_bug', 'unclear', 'not_fixed', 'duplicate', 'open', 'non-bug']))
 
 
-# ---------- check 3: the same inside each repo ----------
 bugs = train[train['group'].isin(['true_bug', 'unclear', 'not_fixed'])]
 print('\nCHECK 3: code and error % inside each repo')
 print((bugs.groupby(['repo', 'group'])[['f_code', 'f_error']].mean() * 100).round().unstack())
 
-
-# ---------- check 4: words typical for real bugs vs non-bugs ----------
 sure = train[train['group'].isin(['true_bug', 'non-bug'])]
 counter = CountVectorizer(binary=True, min_df=20)
 X = counter.fit_transform((sure['clean_title'] + ' ' + sure['clean_text']).str.lower())

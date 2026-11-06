@@ -1,4 +1,4 @@
-# step8_trust.py - combine the evidence into trust levels, then train on the sure ones
+
 
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -11,32 +11,31 @@ data = pd.read_parquet(DATA_FOLDER + '/model_ready.parquet')
 data = data.merge(pd.read_parquet(DATA_FOLDER + '/signals.parquet'), on=['repo', 'number'])
 
 
-# ---------- 1. trust level for every issue ----------
 def trust(row):
     if row['is_bug'] == 0:
-        return 'strong_not_bug'                                           # feature / docs / question
-    yes = row['fixed'] or row['maint_confirm'] or row['maint_already_fixed']  # evidence it IS a bug
-    no = row['maint_reject']                                              # evidence it is NOT a bug
+        return 'strong_not_bug'                                         
+    yes = row['fixed'] or row['maint_confirm'] or row['maint_already_fixed']  
+    no = row['maint_reject']                                            
     if yes and not no:
         return 'strong_bug'
     if no and not yes:
         return 'strong_not_bug'
-    return 'uncertain'                                                    # no evidence, or evidence disagrees
+    return 'uncertain'                                                    
 
 
 data['trust'] = data.apply(trust, axis=1)
-data['answer'] = (data['trust'] == 'strong_bug').astype(int)              # the new, cleaner answer
+data['answer'] = (data['trust'] == 'strong_bug').astype(int)              
 print('TRUST LEVELS PER REPO')
 print(pd.crosstab(data['repo'], data['trust'], margins=True))
 
-# ---------- 2. hide project names (stops the "electron" shortcut) ----------
+
 NAMES = r'\b(?:electron|pandas|numpy|scikit-learn|sklearn|pytest)\b'
 data['masked'] = data['text'].str.replace(NAMES, 'PROJECT', case=False, regex=True)
 
-# ---------- 3. three models, each tested two ways ----------
+
 train = data[data['split'] == 'train']
 val = data[data['split'] == 'val']
-val_strong = val[val['trust'] != 'uncertain']       # only issues we trust
+val_strong = val[val['trust'] != 'uncertain']       
 
 
 def train_and_test(name, rows, label, text):
@@ -63,13 +62,12 @@ print('val_all    = tested on all labels (as before)')
 print('val_strong = tested only on issues we trust')
 print(pd.DataFrame(results).to_string(index=False))
 
-# ---------- 4. what did model C learn? ----------
+
 words = pd.DataFrame({'word': tfidf.get_feature_names_out(), 'weight': model.coef_[0]}).sort_values('weight')
 print('\nMODEL C - strongest BUG words')
 print(words.tail(15)['word'].tolist())
 print('MODEL C - strongest NOT-BUG words')
 print(words.head(15)['word'].tolist())
 
-# ---------- 5. save ----------
 data[['repo', 'number', 'trust', 'answer']].to_parquet(DATA_FOLDER + '/trust.parquet')
 print('\nSaved trust.parquet')
